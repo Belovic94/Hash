@@ -18,6 +18,7 @@ struct hash{
   hash_destruir_dato_t* destructor;
   size_t capacidad; //tamaño del arreglo.
   size_t cantidad; //cantidad de lugares ocupados.
+  size_t cant_borrados; //cantidad de lugares borrados.
   nodo_t* tabla;//arreglo de nodos.
 };
 
@@ -53,7 +54,8 @@ hash_t *hash_crear(hash_destruir_dato_t destruir_dato){
     hash->tabla.estado = VACIO;
   }
   hash->capacidad = TAM_INICIAL;
-  hash->cantidad = 0
+  hash->cant_borrados = 0;
+  hash->cantidad = 0;
   return hash;
 }
 
@@ -66,6 +68,10 @@ bool hash_guardar(hash_t *hash, const char *clave, void *dato){
     pos++;
   }
   hash->tabla[pos].dato = dato;
+  hash->tabla[pos].clave = malloc(sizeof(char*));
+  if(!hash->tabla[pos].clave){
+    return false;
+  }
   strcpy(hash->tabla[pos].clave, clave);
   hash->table[pos].estado = DATO;
   hash->cantidad += 1;
@@ -77,12 +83,13 @@ void *hash_borrar(hash_t *hash, const char *clave){
     return NULL;
   }
   size_t pos = hashing(hash->capacidad, clave);
-  while(hash->tabla[pos].estado != VACIO && !strcmp(hash->tabla[pos].clave, clave)){
+  while(hash->tabla[pos].estado != VACIO && strcmp(hash->tabla[pos].clave, clave) != 0){
     pos++;
   }
-  if(hash->tabla[pos].estado == VACIO){
+  if(hash->tabla[pos].estado == VACIO || hash->tabla[pos].estado == BORRADO){
     return NULL;
   }
+  hash->cant_borrados += 1;
   hash->table[pos].estado = BORRADO;
   return hash->tabla[pos].dato;
 
@@ -97,7 +104,7 @@ bool hash_pertenece(const hash_t *hash, const char *clave){
 }
 
 size_t hash_cantidad(const hash_t *hash){
-  return hash->cantidad;
+  return hash->cantidad - hash->borrados;
 }
 
 void hash_destruir(hash_t *hash){
