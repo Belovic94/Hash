@@ -117,22 +117,41 @@ void hash_destruir(hash_t *hash){
  * *****************************************************************/
 
 hash_iter_t *hash_iter_crear(const hash_t *hash){
-
+  hash_iter_t* iter = malloc(sizeof(hash_iter_t));
+  if (!iter)
+    return NULL;
+  iter->hash = hash;
+  iter->actual = tabla[0];
+  iter->anterior = NULL;
+  return iter;
 }
 
 
 bool hash_iter_avanzar(hash_iter_t *iter){
-
+  if (hash_iter_al_final(iter))
+    return false;
+  iter->actual++;
+  for(int i = 0; iter->actual->estado != DATO && i < iter->hash->capacidad; i++){
+    iter->actual++;
+    iter->anterior++;
+  }
+  if (hash_iter_al_final(iter));
+    return false;
+  return true;
 }
 
 
 const char *hash_iter_ver_actual(const hash_iter_t *iter){
-
+  if hash_iter_al_final(iter)
+    return NULL;
+  return iter->actual->clave;
 }
 
 
 bool hash_iter_al_final(const hash_iter_t *iter){
-
+  if (iter->actual != NULL)
+    return false;
+  return true;
 }
 
 void hash_iter_destruir(hash_iter_t* iter){
