@@ -3,9 +3,10 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
-#define TAM_INICIAL 5301 //número primo.(Es asi de grande para no hacer la redimension)
+#define TAM_INICIAL 101 //número primo.
 #define PIVOTE1 378551
 #define PIVOTE2 63689
+#define F_CARGA 0.5
 
 typedef enum{VACIO, BORRADO, DATO} estado_t;
 
@@ -31,8 +32,9 @@ struct hash_iter{
 };
 
 /* *****************************************************************
- *                     PRIMITIVAS TABLA  HASH                      *
+ *                      FUNCIONES AUXILIARES                       *
  * *****************************************************************/
+
 //devuelve una posicion en el arreglo;
 size_t hashing(size_t capacidad, const char *clave){
   size_t hash = 0, pivot1 = PIVOTE1, pivot2 = PIVOTE2;
@@ -51,7 +53,7 @@ bool misma_clave(const hash_t *hash, const char *clave, size_t index){
 //Aplica el Quadratic Probing.
 //Devuelve la posicion en donde encontro un lugar vacio o la clave ingresada.
 size_t manejar_colisiones(const hash_t* hash, const char *clave, size_t index){
-  for(size_t i = 0; i < hash->capacidad; i++){
+  for(size_t i = 0; i < hash->capacidad ; i++){
     if(index % 2 == 0)
       index = (index - i*i) % hash->capacidad;
     else
@@ -72,21 +74,70 @@ size_t obtener_indice(const hash_t* hash, const char *clave){
   return manejar_colisiones(hash, clave, index);
 }
 
+void inicializar_tabla_hash(nodo_t *tabla, size_t capacidad){
+  for(int i = 0; i < capacidad; i++){//coloco a todos los nodos en estado VACIO
+    tabla[i].estado = VACIO;
+  }
+}
+//Devuelve un array de nodos del tamaño especificado por parametro.
+//En caso contrario, devuelve NULL.
+nodo_t *crear_tabla_hash(size_t capacidad){
+  nodo_t *tabla_hash = malloc(capacidad * sizeof(nodo_t));
+  if(!tabla_hash)
+    return NULL;
+  inicializar_tabla_hash(tabla_hash, capacidad);
+  return tabla_hash;
+}
+//Agrga los valores de una tabla existente a la recien creada.
+//Devuelve true si puede hacerlo, si no devuelve false.
+//Pre:el hash fue creado y la tabla no tiene que estar vacia.
+bool llenar_tabla_nueva(hash_t *hash, nodo_t *tabla_anterior){
+  size_t index;
+  for(int i = 0; i < hash->capacidad/2; i++){
+    if(tabla_anterior[i].estado == DATO){
+      index = obtener_indice(hash, tabla_anterior[i].clave);
+      if(index > hash->capacidad)
+        return false;
+      hash->tabla[index].dato = tabla_anterior[i].dato;
+      hash->tabla[index].estado = DATO;
+      hash->tabla[index].clave = malloc((strlen(tabla_anterior[i].clave) + 1) * sizeof(char));
+      if(!hash->tabla[index].clave)
+        return false;
+      strcpy(hash->tabla[index].clave, tabla_anterior[i].clave);
+      free(tabla_anterior[i].clave);
+    }
+  }
+  return true;
+}
+
+bool hash_redimensionar(hash_t* hash){
+  nodo_t *tabla_aux = hash->tabla;
+  hash->tabla = crear_tabla_hash(hash->capacidad * 2);
+  hash->capacidad *= 2;
+  if(!llenar_tabla_nueva(hash, tabla_aux)){
+    free(hash->tabla);
+    hash->capacidad /= 2;
+    hash->tabla = tabla_aux;
+    return false;
+  }
+  free(tabla_aux);
+  return true;
+}
+/* *****************************************************************
+ *                     PRIMITIVAS TABLA  HASH                      *
+ * *****************************************************************/
 
 hash_t *hash_crear(hash_destruir_dato_t destruir_dato){
   hash_t* hash = malloc(sizeof(hash_t));
   if(!hash){
     return NULL;
   }
-  hash->tabla = malloc(TAM_INICIAL * sizeof(nodo_t));
+  hash->tabla = crear_tabla_hash(TAM_INICIAL);
   if (!hash->tabla){
     free(hash);
     return NULL;
   }
   hash->capacidad = TAM_INICIAL;
-  for(int i = 0; i < hash->capacidad; i++){//coloco a todos los nodos en estado VACIO
-    hash->tabla[i].estado = VACIO;
-  }
   hash->cant_borrados = 0;
   hash->cantidad = 0;
   hash->destructor = destruir_dato;
@@ -96,6 +147,11 @@ hash_t *hash_crear(hash_destruir_dato_t destruir_dato){
 bool hash_guardar(hash_t *hash, const char *clave, void *dato){
   if(!hash || !clave){//Si la clave o hash son NULL, sale.
     return false;
+  }
+  //verifico si hay que redimensionar.
+  if(((double)hash->cantidad / (double)hash->capacidad)  >= F_CARGA){
+    if(!hash_redimensionar(hash))
+      return false;
   }
   size_t index = obtener_indice(hash, clave);
   if(index > hash->capacidad)
@@ -132,7 +188,7 @@ void *hash_obtener(const hash_t *hash, const char *clave){
   if(!hash || !clave)
     return NULL;
   size_t index = obtener_indice(hash, clave);
-  if(hash->tabla[index].estado == VACIO){
+  if(index > hash->capacidad || hash->tabla[index].estado == VACIO){
     return NULL;
   }
   return hash->tabla[index].dato;
@@ -142,7 +198,7 @@ bool hash_pertenece(const hash_t *hash, const char *clave){
   if(!hash || !clave)
     return false;
   size_t index = obtener_indice(hash, clave);
-  if(hash->tabla[index].estado == VACIO){
+  if(index > hash->capacidad || hash->tabla[index].estado == VACIO){
     return false;
   }
   return true;
